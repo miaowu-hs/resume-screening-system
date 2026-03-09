@@ -1,0 +1,66 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: resume-screening-system
+  
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/resume_screening?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+  
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+  
+  # AI 配置 (智谱 GLM)
+  ai:
+    openai:
+      api-key: ${GLM_API_KEY:your-api-key}
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      chat:
+        options:
+          model: glm-4
+          temperature: 0.7
+      embedding:
+        options:
+          model: embedding-3
+
+# MyBatis Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath:mapper/*.xml
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:resume-screening-secret-key-2024}
+  expiration: 86400000
+
+# 文件存储配置
+file:
+  upload-path: /data/resume-files/
+  
+# 向量数据库配置 (Chroma)
+chroma:
+  host: localhost
+  port: 8000
+  collection-name: resume_knowledge
+
+# 日志配置
+logging:
+  level:
+    com.resume: debug
+    org.springframework.ai: debug
