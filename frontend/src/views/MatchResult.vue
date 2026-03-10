@@ -145,6 +145,9 @@ watch(() => route.query.showHistory, (val) => {
     loadMatchResults(false)
   } else if (val === 'high') {
     loadMatchResults(true)
+  } else {
+    // 没有参数时默认加载所有历史
+    loadMatchResults(false)
   }
 }, { immediate: true })
 
