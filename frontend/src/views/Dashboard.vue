@@ -102,8 +102,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Document, Briefcase, Connection, Star, Refresh } from '@element-plus/icons-vue'
-import { getStats } from '../api/stats'
-import { getResumes } from '../api/resume'
+import { getStats, getRecentResumes, getTopMatches } from '../api/stats'
 
 const loading = ref(false)
 const stats = ref({
@@ -126,21 +125,22 @@ const getScoreType = (score) => {
 const loadData = async () => {
   loading.value = true
   try {
-    // 获取统计数据（响应拦截器已返回 response.data）
+    // 获取统计数据
     const statsRes = await getStats()
     if (statsRes.code === 200) {
       stats.value = statsRes.data
     }
     
     // 获取最近简历
-    const resumesRes = await getResumes()
-    if (resumesRes.code === 200 && resumesRes.data) {
-      recentResumes.value = resumesRes.data.slice(0, 5).map(r => ({
-        candidateName: r.candidateName,
-        education: r.education,
-        experienceYears: r.experienceYears,
-        createdAt: r.createdAt
-      }))
+    const resumesRes = await getRecentResumes()
+    if (resumesRes.code === 200) {
+      recentResumes.value = resumesRes.data || []
+    }
+    
+    // 获取 TOP 5 匹配
+    const topRes = await getTopMatches()
+    if (topRes.code === 200) {
+      topMatches.value = topRes.data || []
     }
   } catch (e) {
     console.error('获取数据失败', e)
