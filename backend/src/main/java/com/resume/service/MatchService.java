@@ -122,4 +122,14 @@ public class MatchService {
     public List<MatchRecord> list() {
         return matchRecordService.list();
     }
+    
+    /**
+     * 获取高匹配记录（匹配度 >= 80）
+     */
+    public List<MatchRecord> getHighMatchRecords() {
+        return matchRecordService.lambdaQuery()
+                .ge(MatchRecord::getMatchScore, new BigDecimal("80"))
+                .orderByDesc(MatchRecord::getMatchScore)
+                .list();
+    }
 }

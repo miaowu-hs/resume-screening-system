@@ -5,6 +5,9 @@
         <div class="card-header">
           <span>匹配结果</span>
           <div>
+            <el-button :icon="Refresh" @click="handleRefresh" :loading="loading" style="margin-right: 10px">
+              查看历史
+            </el-button>
             <el-select v-model="selectedResume" placeholder="选择简历" style="width: 200px; margin-right: 10px">
               <el-option v-for="r in resumes" :key="r.id" :label="r.candidateName" :value="r.id" />
             </el-select>
@@ -27,9 +30,9 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="matchReason" label="匹配理由" min-width="300">
+        <el-table-column prop="matchReason" label="匹配理由" min-width="400">
           <template #default="{ row }">
-            <el-text line-clamp="2">{{ row.matchReason }}</el-text>
+            <div class="match-reason-text">{{ row.matchReason }}</div>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
@@ -47,38 +50,14 @@
         </el-table-column>
       </el-table>
     </el-card>
-
-    <!-- 匹配详情对话框 -->
-    <el-dialog v-model="detailVisible" title="匹配详情" width="700px">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="候选人">{{ currentMatch.candidateName }}</el-descriptions-item>
-        <el-descriptions-item label="岗位">{{ currentMatch.positionTitle }}</el-descriptions-item>
-        <el-descriptions-item label="匹配度" :span="2">
-          <el-progress :percentage="currentMatch.matchScore" :color="getScoreColor(currentMatch.matchScore)" />
-        </el-descriptions-item>
-        <el-descriptions-item label="匹配理由" :span="2">
-          {{ currentMatch.matchReason }}
-        </el-descriptions-item>
-      </el-descriptions>
-      
-      <h4 style="margin-top: 20px">技能分析</h4>
-      <div v-if="skillMatch">
-        <p><strong>匹配技能：</strong>
-          <el-tag v-for="s in skillMatch.matched" :key="s" type="success" style="margin-right: 5px">{{ s }}</el-tag>
-        </p>
-        <p><strong>缺失技能：</strong>
-          <el-tag v-for="s in skillMatch.missing" :key="s" type="danger" style="margin-right: 5px">{{ s }}</el-tag>
-        </p>
-        <p><strong>分析：</strong>{{ skillMatch.analysis }}</p>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { getMatchResults, batchMatch } from '../api/match'
 import { getResumes } from '../api/resume'
 
@@ -88,9 +67,6 @@ const matching = ref(false)
 const matchResults = ref([])
 const resumes = ref([])
 const selectedResume = ref(null)
-const detailVisible = ref(false)
-const currentMatch = ref({})
-const skillMatch = ref(null)
 
 const getScoreColor = (score) => {
   if (score >= 80) return '#67C23A'
@@ -111,16 +87,24 @@ const getStatusText = (status) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [matchRes, resumeRes] = await Promise.all([
-      getMatchResults({ resumeId: route.query.resumeId }),
-      getResumes()
-    ])
-    matchResults.value = matchRes.data || []
+    const resumeRes = await getResumes()
     resumes.value = resumeRes.data || []
     
     if (route.query.resumeId) {
       selectedResume.value = Number(route.query.resumeId)
     }
+  } finally {
+    loading.value = false
+  }
+}
+
+// 加载匹配结果
+const loadMatchResults = async (highMatch = false) => {
+  loading.value = true
+  try {
+    const params = highMatch ? { highMatch: true } : {}
+    const matchRes = await getMatchResults(params)
+    matchResults.value = matchRes.data || []
   } finally {
     loading.value = false
   }
@@ -142,6 +126,11 @@ const handleBatchMatch = async () => {
   }
 }
 
+// 查看历史按钮
+const handleRefresh = async () => {
+  await loadMatchResults(false)
+}
+
 const handleAccept = (row) => {
   ElMessage.success('已标记为通过')
 }
@@ -149,6 +138,15 @@ const handleAccept = (row) => {
 const handleReject = (row) => {
   ElMessage.info('已标记为拒绝')
 }
+
+// 监听路由参数变化
+watch(() => route.query.showHistory, (val) => {
+  if (val === 'all') {
+    loadMatchResults(false)
+  } else if (val === 'high') {
+    loadMatchResults(true)
+  }
+}, { immediate: true })
 
 onMounted(() => {
   loadData()
@@ -160,5 +158,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.match-reason-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 </style>

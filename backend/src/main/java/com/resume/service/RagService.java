@@ -1,17 +1,15 @@
 package com.resume.service;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
 import com.resume.dto.MatchResultDTO;
 import com.resume.entity.JobPosition;
-import com.resume.entity.MatchRecord;
 import com.resume.entity.Resume;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.http.*;
 
-import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -23,9 +21,10 @@ public class RagService {
     @Autowired
     private RestTemplate restTemplate;
     
-    // 智谱 API 配置（从配置文件读取）
-    private String apiUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+    @Value("${spring.ai.openai.api-key}")
     private String apiKey;
+    
+    private static final String API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
     
     /**
      * 构建匹配 Prompt
@@ -53,7 +52,7 @@ public class RagService {
             2. 匹配理由（说明为什么匹配或不匹配）
             3. 技能匹配详情（逐项分析技能匹配情况）
             
-            请以JSON格式输出：
+            请直接输出JSON格式，不要包含markdown代码块:
             {
               "score": 数字,
               "reason": "匹配理由",
@@ -68,7 +67,7 @@ public class RagService {
             resume.getEducation(),
             resume.getExperienceYears() != null ? resume.getExperienceYears() : 0,
             resume.getSkills(),
-            resume.getWorkHistory(),
+            resume.getWorkHistory() != null ? resume.getWorkHistory() : "无",
             position.getTitle(),
             position.getDepartment(),
             position.getSkills(),
@@ -81,6 +80,7 @@ public class RagService {
      * 调用 GLM API 获取匹配结果
      */
     public Map<String, Object> callLLM(String prompt, String apiKey) {
+        Exception error = null;
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -93,7 +93,7 @@ public class RagService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.postForObject(apiUrl, request, Map.class);
+            Map<String, Object> response = restTemplate.postForObject(API_URL, request, Map.class);
             
             if (response != null && response.containsKey("choices")) {
                 @SuppressWarnings("unchecked")
@@ -103,18 +103,29 @@ public class RagService {
                     Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
                     String content = (String) message.get("content");
                     
+                    // 提取 JSON（处理 markdown 代码块）
+                    if (content.contains("```json")) {
+                        content = content.substring(content.indexOf("```json") + 7);
+                        content = content.substring(0, content.indexOf("```"));
+                    } else if (content.contains("```")) {
+                        content = content.substring(content.indexOf("```") + 3);
+                        content = content.substring(0, content.lastIndexOf("```"));
+                    }
+                    content = content.trim();
+                    
                     // 解析 JSON 响应
                     return JSON.parseObject(content, Map.class);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
+            error = e;
         }
         
         // 返回默认值
         Map<String, Object> defaultResult = new HashMap<>();
         defaultResult.put("score", 0);
-        defaultResult.put("reason", "AI分析失败");
+        defaultResult.put("reason", "AI分析失败: " + (error != null ? error.getMessage() : "未知错误"));
         defaultResult.put("skillMatch", Map.of("matched", List.of(), "missing", List.of(), "analysis", "无法分析"));
         return defaultResult;
     }

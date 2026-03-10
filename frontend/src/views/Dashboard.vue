@@ -1,49 +1,63 @@
 <template>
   <div class="dashboard">
+    <div class="dashboard-header">
+      <span></span>
+      <el-button type="primary" :icon="Refresh" @click="loadData" :loading="loading">
+        刷新数据
+      </el-button>
+    </div>
     <el-row :gutter="20">
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #409EFF">
-            <el-icon><Document /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.resumeCount }}</div>
-            <div class="stat-label">简历总数</div>
-          </div>
-        </el-card>
+        <router-link to="/resumes" class="stat-link">
+          <el-card class="stat-card clickable">
+            <div class="stat-icon" style="background: #409EFF">
+              <el-icon><Document /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.resumeCount }}</div>
+              <div class="stat-label">简历总数</div>
+            </div>
+          </el-card>
+        </router-link>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #67C23A">
-            <el-icon><Briefcase /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.positionCount }}</div>
-            <div class="stat-label">岗位总数</div>
-          </div>
-        </el-card>
+        <router-link to="/positions" class="stat-link">
+          <el-card class="stat-card clickable">
+            <div class="stat-icon" style="background: #67C23A">
+              <el-icon><Briefcase /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.positionCount }}</div>
+              <div class="stat-label">岗位总数</div>
+            </div>
+          </el-card>
+        </router-link>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #E6A23C">
-            <el-icon><Connection /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.matchCount }}</div>
-            <div class="stat-label">匹配次数</div>
-          </div>
-        </el-card>
+        <router-link to="/match?showHistory=all" class="stat-link">
+          <el-card class="stat-card clickable">
+            <div class="stat-icon" style="background: #E6A23C">
+              <el-icon><Connection /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.matchCount }}</div>
+              <div class="stat-label">匹配次数</div>
+            </div>
+          </el-card>
+        </router-link>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-icon" style="background: #F56C6C">
-            <el-icon><Star /></el-icon>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ stats.highMatchCount }}</div>
-            <div class="stat-label">高匹配数</div>
-          </div>
-        </el-card>
+        <router-link to="/match?showHistory=high" class="stat-link">
+          <el-card class="stat-card clickable">
+            <div class="stat-icon" style="background: #F56C6C">
+              <el-icon><Star /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.highMatchCount }}</div>
+              <div class="stat-label">高匹配数</div>
+            </div>
+          </el-card>
+        </router-link>
       </el-col>
     </el-row>
 
@@ -59,6 +73,7 @@
             <el-table-column prop="experienceYears" label="工作年限" />
             <el-table-column prop="createdAt" label="上传时间" width="180" />
           </el-table>
+          <el-empty v-if="recentResumes.length === 0" description="暂无简历数据" />
         </el-card>
       </el-col>
       <el-col :span="12">
@@ -77,6 +92,7 @@
               </template>
             </el-table-column>
           </el-table>
+          <el-empty v-if="topMatches.length === 0" description="暂无匹配数据" />
         </el-card>
       </el-col>
     </el-row>
@@ -85,8 +101,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Document, Briefcase, Connection, Star } from '@element-plus/icons-vue'
+import { Document, Briefcase, Connection, Star, Refresh } from '@element-plus/icons-vue'
+import { getStats } from '../api/stats'
+import { getResumes } from '../api/resume'
 
+const loading = ref(false)
 const stats = ref({
   resumeCount: 0,
   positionCount: 0,
@@ -103,29 +122,35 @@ const getScoreType = (score) => {
   return 'danger'
 }
 
-onMounted(async () => {
-  // TODO: 调用接口获取数据
-  // 模拟数据
-  stats.value = {
-    resumeCount: 156,
-    positionCount: 12,
-    matchCount: 423,
-    highMatchCount: 28
+// 加载数据
+const loadData = async () => {
+  loading.value = true
+  try {
+    // 获取统计数据（响应拦截器已返回 response.data）
+    const statsRes = await getStats()
+    if (statsRes.code === 200) {
+      stats.value = statsRes.data
+    }
+    
+    // 获取最近简历
+    const resumesRes = await getResumes()
+    if (resumesRes.code === 200 && resumesRes.data) {
+      recentResumes.value = resumesRes.data.slice(0, 5).map(r => ({
+        candidateName: r.candidateName,
+        education: r.education,
+        experienceYears: r.experienceYears,
+        createdAt: r.createdAt
+      }))
+    }
+  } catch (e) {
+    console.error('获取数据失败', e)
+  } finally {
+    loading.value = false
   }
-  
-  recentResumes.value = [
-    { candidateName: '张三', education: '本科', experienceYears: 3, createdAt: '2024-03-09 16:30' },
-    { candidateName: '李四', education: '硕士', experienceYears: 5, createdAt: '2024-03-09 15:20' },
-    { candidateName: '王五', education: '本科', experienceYears: 2, createdAt: '2024-03-09 14:10' }
-  ]
-  
-  topMatches.value = [
-    { candidateName: '赵六', positionTitle: 'Java开发工程师', matchScore: 95 },
-    { candidateName: '孙七', positionTitle: '前端开发工程师', matchScore: 88 },
-    { candidateName: '周八', positionTitle: 'Python开发工程师', matchScore: 82 },
-    { candidateName: '吴九', positionTitle: '测试工程师', matchScore: 76 },
-    { candidateName: '郑十', positionTitle: '运维工程师', matchScore: 71 }
-  ]
+}
+
+onMounted(() => {
+  loadData()
 })
 </script>
 
@@ -134,10 +159,32 @@ onMounted(async () => {
   padding: 0;
 }
 
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.stat-link {
+  text-decoration: none;
+  display: block;
+}
+
 .stat-card {
   display: flex;
   align-items: center;
   padding: 20px;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .stat-card :deep(.el-card__body) {
