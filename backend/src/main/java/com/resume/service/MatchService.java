@@ -47,15 +47,24 @@ public class MatchService {
         // 调用 RAG 服务进行匹配分析
         MatchResultDTO result = ragService.analyzeMatch(resume, position, apiKey);
         
-        // 保存匹配记录
-        MatchRecord record = new MatchRecord();
-        record.setResumeId(resumeId);
-        record.setPositionId(positionId);
+        // 查找是否已存在匹配记录（同一简历+岗位）
+        MatchRecord record = matchRecordService.lambdaQuery()
+                .eq(MatchRecord::getResumeId, resumeId)
+                .eq(MatchRecord::getPositionId, positionId)
+                .one();
+        
+        if (record == null) {
+            // 新增
+            record = new MatchRecord();
+            record.setResumeId(resumeId);
+            record.setPositionId(positionId);
+        }
+        
         record.setMatchScore(BigDecimal.valueOf(result.getMatchScore()));
         record.setMatchReason(result.getMatchReason());
         record.setSkillMatch(result.getSkillMatch());
         record.setStatus("pending");
-        matchRecordService.save(record);
+        matchRecordService.saveOrUpdate(record);
         
         return result;
     }
@@ -76,15 +85,24 @@ public class MatchService {
             try {
                 MatchResultDTO result = ragService.analyzeMatch(resume, position, apiKey);
                 
-                // 保存匹配记录
-                MatchRecord record = new MatchRecord();
-                record.setResumeId(resumeId);
-                record.setPositionId(position.getId());
+                // 查找是否已存在匹配记录（同一简历+岗位）
+                MatchRecord record = matchRecordService.lambdaQuery()
+                        .eq(MatchRecord::getResumeId, resumeId)
+                        .eq(MatchRecord::getPositionId, position.getId())
+                        .one();
+                
+                if (record == null) {
+                    // 新增
+                    record = new MatchRecord();
+                    record.setResumeId(resumeId);
+                    record.setPositionId(position.getId());
+                }
+                
                 record.setMatchScore(BigDecimal.valueOf(result.getMatchScore()));
                 record.setMatchReason(result.getMatchReason());
                 record.setSkillMatch(result.getSkillMatch());
                 record.setStatus("pending");
-                matchRecordService.save(record);
+                matchRecordService.saveOrUpdate(record);
                 
                 results.add(result);
             } catch (Exception e) {
